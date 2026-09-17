@@ -1,0 +1,18 @@
+{
+  "dataStatus": [
+    "detail",
+    "partial",
+    "list_only"
+  ],
+  "description": {
+    "detail": "상세 데이터가 확인된 골프장",
+    "partial": "기본정보는 있으나 상세 항목 일부만 확인된 골프장",
+    "list_only": "골프장 목록/기본정보만 확인된 골프장"
+  },
+  "rules": [
+    "원본에 없는 값은 null로 유지",
+    "null을 임의의 가격/가능 여부로 추정하지 않음",
+    "sourceName, sourceUrl, checkedAt을 함께 저장",
+    "실제 최신성은 원본 데이터 갱신 주기에 좌우됨"
+  ]
+}

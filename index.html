@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>전국 골프장 검색</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f7f5;color:#172017;font-family:Arial,"Noto Sans KR",sans-serif}
+header{background:#163d28;color:#fff;padding:34px 5vw 28px}.eyebrow{font-size:12px;opacity:.7;letter-spacing:.12em}.title{font-size:42px;font-weight:800;letter-spacing:-.05em;margin:7px 0}.desc{opacity:.82}
+main{max-width:1500px;margin:auto;padding:22px 5vw}.filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:8px}
+input,select{width:100%;padding:12px;border:1px solid #d9ddd8;border-radius:9px;background:#fff}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.stat{background:#fff;border:1px solid #e1e4e0;border-radius:10px;padding:13px 18px;min-width:135px}.num{font-size:24px;font-weight:800}.label{font-size:12px;color:#737a73;margin-top:3px}
+.notice{background:#fff;border:1px solid #e1e4e0;border-radius:10px;padding:12px 15px;margin-bottom:14px;font-size:13px;color:#5f665f}
+.table{background:#fff;border:1px solid #e1e4e0;border-radius:12px;overflow:auto}.row{display:grid;grid-template-columns:2.1fr 100px 100px 100px 120px 120px 110px 110px 110px;min-width:1200px;border-bottom:1px solid #eee}
+.row>div{padding:12px}.head{background:#fafbf9;color:#707770;font-size:11px;font-weight:700;position:sticky;top:0}.name{font-weight:800}.sub{font-size:11px;color:#888;margin-top:4px}
+.badge{display:inline-block;padding:4px 7px;border-radius:8px;font-size:11px;font-weight:700}.detail{background:#e8f5ec;color:#24683d}.partial{background:#fff4d8;color:#896500}.list{background:#eee;color:#666}
+.yes{color:#16743c;font-weight:700}.no{color:#b44b43;font-weight:700}.unknown{color:#999}
+.empty{padding:40px;text-align:center;color:#888}
+@media(max-width:900px){.filters{grid-template-columns:1fr 1fr}.title{font-size:32px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">NATIONAL GOLF COURSE INDEX · AUTO UPDATE</div>
+  <div class="title">전국 골프장</div>
+  <div class="desc">목록만 확인된 골프장과 상세정보가 확인된 골프장을 구분합니다. 확인되지 않은 값은 임의로 채우지 않습니다.</div>
+</header>
+<main>
+  <div class="filters">
+    <input id="q" placeholder="골프장명 / 지역 / 시·군 검색">
+    <select id="region"><option value="">전체 지역</option></select>
+    <select id="status">
+      <option value="">데이터 상태 전체</option>
+      <option value="detail">상세정보 확인</option>
+      <option value="partial">일부 정보 확인</option>
+      <option value="list_only">목록만 확인</option>
+    </select>
+    <select id="price"><option value="">주중 그린피 전체</option><option value="100000">10만원 이하</option><option value="150000">15만원 이하</option><option value="200000">20만원 이하</option></select>
+    <select id="type"><option value="">유형 전체</option><option value="public">퍼블릭</option><option value="member">회원제</option><option value="resort">리조트형</option></select>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="num" id="result">0</div><div class="label">검색 결과</div></div>
+    <div class="stat"><div class="num" id="total">0</div><div class="label">전체 골프장</div></div>
+    <div class="stat"><div class="num" id="detailCount">0</div><div class="label">상세정보 확인</div></div>
+    <div class="stat"><div class="num" id="listCount">0</div><div class="label">목록만 확인</div></div>
+    <div class="stat"><div class="num" id="updated">-</div><div class="label">데이터 갱신일</div></div>
+  </div>
+
+  <div class="notice">
+    <b>데이터 상태 안내</b> ·
+    <span class="badge detail">상세정보 확인</span> 가격·코스 등 상세값이 있는 데이터 ·
+    <span class="badge partial">일부 정보 확인</span> 일부 항목만 있는 데이터 ·
+    <span class="badge list">목록만 확인</span> 골프장 존재/기본정보만 확인된 데이터
+  </div>
+
+  <div class="table">
+    <div class="row head">
+      <div>골프장</div><div>지역</div><div>상태</div><div>홀/PAR</div>
+      <div>주중</div><div>주말</div><div>캐디피</div><div>카트비</div><div>3인 / 노캐디</div>
+    </div>
+    <div id="list"></div>
+  </div>
+</main>
+
+<script>
+let data=[];
+const $=id=>document.getElementById(id);
+const won=v=>v==null?'<span class="unknown">미확인</span>':Number(v).toLocaleString()+'원';
+const yn=v=>v===true?'<span class="yes">가능</span>':v===false?'<span class="no">불가</span>':'<span class="unknown">확인 필요</span>';
+function statusBadge(s){
+  if(s==='detail') return '<span class="badge detail">상세정보 확인</span>';
+  if(s==='partial') return '<span class="badge partial">일부 정보 확인</span>';
+  return '<span class="badge list">목록만 확인</span>';
+}
+function render(){
+  const q=$('q').value.trim().toLowerCase(), r=$('region').value, s=$('status').value;
+  const p=Number($('price').value)||Infinity, t=$('type').value;
+  const rows=data.filter(c=>{
+    const text=`${c.name||''} ${c.region||''} ${c.city||''}`.toLowerCase();
+    return (!q||text.includes(q))&&(!r||c.region===r)&&(!s||c.dataStatus===s)&&(!t||c.type===t)&&((c.weekdayFee??Infinity)<=p);
+  });
+  $('result').textContent=rows.length;
+  $('list').innerHTML=rows.map(c=>`
+    <div class="row">
+      <div><div class="name">${c.name||'—'}</div><div class="sub">${c.city||''}</div></div>
+      <div>${c.region||'—'}</div><div>${statusBadge(c.dataStatus)}</div>
+      <div>${c.holes??'—'} / ${c.par??'—'}</div><div>${won(c.weekdayFee)}</div><div>${won(c.weekendFee)}</div>
+      <div>${won(c.caddieFee)}</div><div>${won(c.cartFee)}</div>
+      <div>${yn(c.threePlayer)} / ${yn(c.noCaddy)}</div>
+    </div>`).join('') || '<div class="empty">조건에 맞는 골프장이 없습니다.</div>';
+}
+async function init(){
+  const res=await fetch('./data/courses.json?'+Date.now(),{cache:'no-store'});
+  if(!res.ok) throw new Error('courses.json not found');
+  const payload=await res.json();
+  data=Array.isArray(payload)?payload:(payload.courses||[]);
+  $('total').textContent=data.length;
+  $('detailCount').textContent=data.filter(c=>c.dataStatus==='detail').length;
+  $('listCount').textContent=data.filter(c=>c.dataStatus==='list_only').length;
+  const checked=[...data].map(c=>c.checkedAt).filter(Boolean).sort().pop();
+  $('updated').textContent=checked?checked.slice(0,10):'-';
+  [...new Set(data.map(c=>c.region).filter(Boolean))].sort().forEach(r=>$('region').insertAdjacentHTML('beforeend',`<option>${r}</option>`));
+  ['q','region','status','price','type'].forEach(id=>$(id).addEventListener('input',render));
+  render();
+}
+init().catch(e=>{$('list').innerHTML='<div class="empty">아직 데이터가 생성되지 않았습니다. GitHub Actions의 Update Golf Data를 한 번 실행하면 전국 데이터가 생성됩니다.</div>'});
+</script>
+</body>
+</html>
