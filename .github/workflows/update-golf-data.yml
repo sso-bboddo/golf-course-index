@@ -1,0 +1,43 @@
+name: Update Golf Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 0 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update base golf course data
+        run: node scripts/update_courses.js
+
+      - name: Enrich from known official golf course homepages
+        run: node scripts/enrich_courses.js
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git reset --soft origin/main
+          git add data/courses.json
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: update golf course data"
+          git push origin HEAD:main
