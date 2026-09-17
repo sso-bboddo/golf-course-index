@@ -10,6 +10,11 @@ on:
       - "scripts/enrich_courses.js"
       - ".github/workflows/update-golf-data.yml"
 
+# 같은 워크플로가 동시에 실행되어 courses.json push가 충돌하지 않도록 함
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -20,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Update base golf course data
         run: node scripts/update_courses.js
@@ -31,6 +38,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 실행 중 원격 main이 바뀌었어도 최신 원격을 기준으로 다시 정렬
+          git fetch origin main
+          git reset --soft origin/main
+
           git add data/courses.json
-          git diff --cached --quiet || git commit -m "chore: update golf course official homepage data"
-          git push
+
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: update golf course official homepage data"
+          git push origin HEAD:main
